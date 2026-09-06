@@ -1,0 +1,10 @@
+rakshika-backend/venv/
+rakshika-backend/__pycache__
+rakshika-backend/.env
+*.pyc
+
+rakshika-frontend/node_modulus
+rakshika-frontend/ .next/
+rakshika-frontend/.env.local
+
+.DS_store
