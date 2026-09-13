@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app=FastAPI(title="Rakshika.API")
 origins=[
     "http://localhost:3000",
-    "https://rakshika-frontend.vercel.app/"
+    "https://rakshika-frontend.vercel.app"
 ]
 app.add_middleware(
     CORSMiddleware,
