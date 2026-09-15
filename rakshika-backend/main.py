@@ -2,6 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine
 from models import Base
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from database import get_db
+from models import User
+from schemas import UserCreate, UserOut
+
 Base.metadata.create_all(bind=engine)
 app=FastAPI(title="Rakshika.API")
 origins=[
@@ -26,3 +32,14 @@ def db_test():
         return {"database":"connected"}
     except Exception as e:  #does not crask
         return{"database":"failed","error":str(e)}
+@app.post("/users", response_model=UserOut)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    new_user = User(name=user.name, email=user.email, phone=user.phone)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+@app.get("/users", response_model=list[UserOut])
+def get_users(db: Session = Depends(get_db)):
+    return db.query(User).all() 
