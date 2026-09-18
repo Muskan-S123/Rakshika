@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 load_dotenv()
 DATABASE_URL=os.getenv("DATABASE_URL") #read the env file used in connection
-engine=create_engine(DATABASE_URL) #actual connection to postgres
+engine=create_engine(DATABASE_URL, pool_pre_ping=True) #actual connection to postgres
 SessionLocal=sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base=declarative_base()
 def get_db():
