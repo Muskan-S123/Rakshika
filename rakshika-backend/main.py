@@ -5,7 +5,9 @@ from models import Base
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User
-from schemas import UserCreate, UserOut
+from schemas import UserCreate, UserOut, Userlogin, UserUpdate
+from auth import hash_password, verify_password, create_jwt_token, get_current_user
+from fastapi.security import OAuth2PasswordRequestForm
 
 
 Base.metadata.create_all(bind=engine)
@@ -24,50 +26,69 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"status":"ok"}
-@app.get("/db_test")
-def db_test():
-    try:
-        conn=engine.connect()#variable connection to connect
-        conn.close()
-        return {"database":"connected"}
-    except Exception as e:  #does not crask
-        return{"database":"failed","error":str(e)}
-@app.post("/users", response_model=UserOut)  #create
+#deleted app.get("db_test") as it was a debug tools its only job was to make sure the connection between neon and databse is correct and all the endpoints are connected
+@app.post("/users", response_model=UserOut,status_code=201)  #create
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    new_user = User(name=user.name, email=user.email, phone=user.phone)
+    if db.query(User).filter(User.email == user.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    new_user = User(name=user.name, email=user.email, phone=user.phone,hashed_password=hash_password(user.password))
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
     return new_user
 
-@app.get("/users", response_model=list[UserOut])  #read
-def get_users(db: Session = Depends(get_db)):
-    return db.query(User).all()
+
+@app.post("/login")
+def login(form:OAuth2PasswordRequestForm=Depends(), db: Session=Depends(get_db)):
+    user=db.query(User).filter(User.email==form.username).first()  #find user by email
+    if not user or not verify_password(form.password,user.hashed_password):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+        #first it was 2 functions ,ii.e, not user / verify_password then we made it into one because if someone login and if he got different messages as incorrect password or user not valid it menas he will get the basic idea of which user is registered or not
+          # check and verify password using two arguments
+     #here we take arguments as (plain_password,hashed_password) from auth.py
+    
+    token=create_jwt_token({"sub":user.email})
+    return {"access_token": token, "token_type": "bearer"}
+
+@app.get("/users/me",response_model=UserOut)
+def read_me(current_user:User=Depends(get_current_user)):
+    return current_user
+         
 
 @app.get("/users/{user_id}",response_model=UserOut)
-def get_user(user_id:int, db:Session=Depends(get_db)):
-    user=db.query(User).filter(User.id==user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
+def get_user(user_id:int, db:Session=Depends(get_db), current_user:str = Depends(get_current_user)):
+  
+   
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not your account") # if id with 7 logins in id 5 it should not authenticate the person with id 7
+    return current_user
+
 @app.put("/users/{user_id}",response_model=UserOut)  #update
-def update_user(user_id:int, user:UserCreate, db:Session=Depends(get_db)):
-    existing_user=db.query(User).filter(User.id==user_id).first() #fetch existing user
-    if not existing_user:
-        raise HTTPException(status_code=404, detail="existing user not found")
-    existing_user.name=user.name
-    existing_user.email=user.email
-    existing_user.phone=user.phone
-    db.commit()
-    db.refresh(existing_user)
-    return existing_user
+def update_user(
+    user_id:int, 
+    data:UserUpdate, 
+    db:Session=Depends(get_db),
+    current_user:User=Depends(get_current_user),
+):
+   if current_user.id!=user_id:
+    raise HTTPException(status_code=403, detail="Not your account")
+   if data.name is not None:
+    current_user.name=data.name
+   if data.phone is not None:
+    current_user.phone=data.phone
+   db.commit()
+   db.refresh(current_user)
+   return current_user
 
 @app.delete("/users/{user_id}") #delete
-def delete_user(user_id:int, db:Session=Depends(get_db)):
-    existing_user=db.query(User).filter(User.id==user_id).first()
-    if not existing_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    db.delete(existing_user)
+def delete_user(
+    user_id:int, 
+    db:Session=Depends(get_db),
+    current_user:User=Depends(get_current_user),
+):
+    if current_user.id!=user_id:
+        raise HTTPException(status_code=403, detail="Not your account")
+    db.delete(current_user)
     db.commit()
     return{"detail":"user deleted"}
 
