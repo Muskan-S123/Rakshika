@@ -1,11 +1,10 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine
-from models import Base
+from models import Base, User,TrustedContact
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User
-from schemas import UserCreate, UserOut, Userlogin, UserUpdate
+from schemas import UserCreate, UserOut, Userlogin, UserUpdate, ContactCreate, ContactOut
 from auth import hash_password, verify_password, create_jwt_token, get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -91,5 +90,45 @@ def delete_user(
     db.delete(current_user)
     db.commit()
     return{"detail":"user deleted"}
+@app.post("/contacts",response_model=ContactOut, status_code=201)
+def add_contact(
+    data:ContactCreate,
+    db:Session=Depends(get_db),
+    current_user:User=Depends(get_current_user),
+):
+    count=db.query(TrustedContact).filter(TrustedContact.user_id==current_user.id).count()
+    if count>=5:
+        raise HTTPException(status_code=400,detail="Maximum 5 contacts allowed")
+    contact = TrustedContact(**data.model_dump(), user_id=current_user.id)
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+@app.get("/contacts", response_model=list[ContactOut])
+def list_contacts(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    return db.query(TrustedContact).filter(TrustedContact.user_id == current_user.id).all()
+
+
+@app.delete("/contacts/{contact_id}", status_code=204)
+def delete_contact(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    contact = (
+        db.query(TrustedContact)
+        .filter(TrustedContact.id == contact_id, TrustedContact.user_id == current_user.id)
+        .first()
+    )
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+    db.delete(contact)
+    db.commit()
+
 
 

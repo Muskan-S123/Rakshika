@@ -19,3 +19,17 @@ class Userlogin(BaseModel):
 class UserUpdate(BaseModel):
     name:str | None=None
     phone:str | None=None
+
+class ContactCreate(BaseModel):
+    name: str=Field(min_length=1,max_length=100)
+    email:EmailStr | None=None
+    phone:str=Field(pattern=r"^\+?[0-9]{10,15}$")
+    relation:str | None=Field(default=None,max_length=50)
+class ContactOut(BaseModel):
+    id:int
+    name:str
+    email:EmailStr |None=None
+    phone:str
+    relation:str| None=None
+
+    model_config=ConfigDict(from_attributes=True)
