@@ -99,11 +99,20 @@ def add_contact(
     count=db.query(TrustedContact).filter(TrustedContact.user_id==current_user.id).count()
     if count>=5:
         raise HTTPException(status_code=400,detail="Maximum 5 contacts allowed")
-    contact = TrustedContact(**data.model_dump(), user_id=current_user.id)
+    email = data.email.lower()
+    existing = db.query(TrustedContact).filter(
+        TrustedContact.user_id == current_user.id,
+        TrustedContact.email == email,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="You already have a contact with this email")
+    contact = TrustedContact(**{**data.model_dump(), "email":email}, user_id=current_user.id)
     db.add(contact)
     db.commit()
     db.refresh(contact)
     return contact
+
+
 
 
 @app.get("/contacts", response_model=list[ContactOut])
