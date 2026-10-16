@@ -1,8 +1,8 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 class UserCreate(BaseModel):
-    name: str
+    name: str=Field(min_length=1, max_length=100)
     email: EmailStr
-    phone: str | None=None
+    phone: str | None=Field(default=None, pattern=r"^\+?[0-9]{10,15}$")
     password: str=Field(min_length=8,max_length=72)
 
 class UserOut(BaseModel):
@@ -17,12 +17,12 @@ class Userlogin(BaseModel):
     email:str
     password:str
 class UserUpdate(BaseModel):
-    name:str | None=None
-    phone:str | None=None
+    name:str | None=Field(default=None, min_length=1, max_length=100)
+    phone:str | None=Field(default=None, pattern=r"^\+?[0-9]{10,15}$")
 
 class ContactCreate(BaseModel):
     name: str=Field(min_length=1,max_length=100)
-    email:EmailStr | None=None
+    email:EmailStr
     phone:str=Field(pattern=r"^\+?[0-9]{10,15}$")
     relation:str | None=Field(default=None,max_length=50)
 class ContactOut(BaseModel):
