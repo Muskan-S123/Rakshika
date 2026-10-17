@@ -4,7 +4,7 @@ from database import engine
 from models import Base, User,TrustedContact
 from sqlalchemy.orm import Session
 from database import get_db
-from schemas import UserCreate, UserOut, Userlogin, UserUpdate, ContactCreate, ContactOut
+from schemas import UserCreate, UserOut, UserUpdate, ContactCreate, ContactOut
 from auth import hash_password, verify_password, create_jwt_token, get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -29,7 +29,8 @@ def health():
 
 @app.post("/users", response_model=UserOut, status_code=201)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == user.email).first():
+    email = user.email.strip().lower()
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=409, detail="Email already registered")
     new_user = User(
         name=user.name,
@@ -46,7 +47,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 @app.post("/login")
 def login(form:OAuth2PasswordRequestForm=Depends(), db: Session=Depends(get_db)):
     email=form.username.strip().lower()
-    user=db.query(User).filter(User.email==form.username).first()  #find user by email
+    user=db.query(User).filter(User.email==email).first()  #find user by email
     if not user or not verify_password(form.password,user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
         #first it was 2 functions ,ii.e, not user / verify_password then we made it into one because if someone login and if he got different messages as incorrect password or user not valid it menas he will get the basic idea of which user is registered or not
@@ -62,7 +63,7 @@ def read_me(current_user:User=Depends(get_current_user)):
          
 
 @app.get("/users/{user_id}",response_model=UserOut)
-def get_user(user_id:int, db:Session=Depends(get_db), current_user:str = Depends(get_current_user)):
+def get_user(user_id:int, db:Session=Depends(get_db), current_user:User = Depends(get_current_user)):
   
    
     if current_user.id != user_id:

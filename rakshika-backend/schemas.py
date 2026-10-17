@@ -17,9 +17,7 @@ class UserOut(BaseModel):
 
     model_config=ConfigDict(from_attributes=True)
             
-class Userlogin(BaseModel):
-    email:str
-    password:str
+
 class UserUpdate(BaseModel):
     name:str | None=Field(default=None, min_length=1, max_length=100)
     phone:str | None=Field(default=None, pattern=r"^\+?[0-9]{10,15}$")
