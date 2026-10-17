@@ -26,11 +26,17 @@ app.add_middleware(
 def health():
     return {"status":"ok"}
 #deleted app.get("db_test") as it was a debug tools its only job was to make sure the connection between neon and databse is correct and all the endpoints are connected
-@app.post("/users", response_model=UserOut,status_code=201)  #create
+
+@app.post("/users", response_model=UserOut, status_code=201)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == user.email).first():
-        raise HTTPException(status_code=400, detail="Email already registered")
-    new_user = User(name=user.name, email=user.email, phone=user.phone,hashed_password=hash_password(user.password))
+        raise HTTPException(status_code=409, detail="Email already registered")
+    new_user = User(
+        name=user.name,
+        email=user.email,
+        phone=user.phone,
+        hashed_password=hash_password(user.password),
+    )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
@@ -39,6 +45,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/login")
 def login(form:OAuth2PasswordRequestForm=Depends(), db: Session=Depends(get_db)):
+    email=form.username.strip().lower()
     user=db.query(User).filter(User.email==form.username).first()  #find user by email
     if not user or not verify_password(form.password,user.hashed_password):
         raise HTTPException(status_code=401, detail="Incorrect email or password")
