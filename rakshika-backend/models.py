@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, func
+from sqlalchemy import Column, Integer, String, ForeignKey, Float, DateTime, func
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -34,4 +34,15 @@ class TrustedContact(Base):
     relation=Column(String,nullable=True)
     created_at=Column(DateTime,server_default=func.now())
     owner=relationship("User",back_populates="contacts")
+
+class SOSEvent(Base):
+    __tablename__="sos_events"
+    id=Column(Integer,primary_key=True)
+    user_id= Column(Integer,ForeignKey("users.id",ondelete="CASCADE"), nullable=False)
+    latitude= Column(Float, nullable=True)
+    longitude=Column(Float, nullable=True)
+    created_at=Column(DateTime(timezone=True), server_default=func.now())
+
+
+
 

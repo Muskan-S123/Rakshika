@@ -1,12 +1,14 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine
-from models import Base, User,TrustedContact
+from models import Base, User,TrustedContact, SOSEvent
 from sqlalchemy.orm import Session
 from database import get_db
-from schemas import UserCreate, UserOut, UserUpdate, ContactCreate, ContactOut
+from schemas import UserCreate, UserOut, UserUpdate, ContactCreate, ContactOut, SOSCreate, SOSOut
 from auth import hash_password, verify_password, create_jwt_token, get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
+from datetime import datetime, timedelta, timezone
+from alerts import send_sos_emails
 
 
 Base.metadata.create_all(bind=engine)
@@ -34,7 +36,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email already registered")
     new_user = User(
         name=user.name,
-        email=user.email,
+        email=email,
         phone=user.phone,
         hashed_password=hash_password(user.password),
     )
@@ -56,6 +58,29 @@ def login(form:OAuth2PasswordRequestForm=Depends(), db: Session=Depends(get_db))
     
     token=create_jwt_token({"sub":user.email})
     return {"access_token": token, "token_type": "bearer"}
+
+@app.post("/sos", response_model=SOSOut, status_code=201)
+def trigger_sos(
+    data: SOSCreate,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    contacts = db.query(TrustedContact).filter(TrustedContact.user_id == current_user.id).all()
+    emails = [c.email for c in contacts if c.email]
+    if not emails:
+        raise HTTPException(status_code=400, detail="Add a trusted contact first")
+
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=60)
+    if db.query(SOSEvent).filter(SOSEvent.user_id == current_user.id, SOSEvent.created_at > cutoff).first():
+        raise HTTPException(status_code=429, detail="SOS already sent in the last minute")
+
+    event = SOSEvent(user_id=current_user.id, latitude=data.latitude, longitude=data.longitude)
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    background.add_task(send_sos_emails, emails, current_user.name, data.latitude, data.longitude)
+    return event
 
 @app.get("/users/me",response_model=UserOut)
 def read_me(current_user:User=Depends(get_current_user)):
