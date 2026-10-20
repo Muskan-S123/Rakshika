@@ -54,7 +54,7 @@ async function request(path: string, options: RequestInit = {}) {
 }
 
 export const api = {
-  register: (name:string, email: string, phone:string, password: string) =>
+  register: (name:string, email: string, phone:string | undefined, password: string) =>
     request("/users", { 
       method: "POST", 
       body: JSON.stringify({ name, email, phone:phone || null, password }),
@@ -76,4 +76,10 @@ export const api = {
   addContact: (c: Omit<Contact, "id">) =>
     request("/contacts", { method: "POST", body: JSON.stringify(c) }),
   deleteContact: (id: number) => request(`/contacts/${id}`, { method: "DELETE" }),
+  sos: (lat: number | null, lng: number |null ) =>
+    request("/sos",{
+      method:"POST",
+      body:JSON.stringify({latitude:lat, longitude:lng}),
+    }),
+  
 };
