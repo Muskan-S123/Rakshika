@@ -4,6 +4,16 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, Contact } from "@/lib/api";
 
+const getLocation = () =>
+  new Promise<{ lat: number | null; lng: number | null }>((resolve) => {
+    if (!navigator.geolocation) return resolve({ lat: null, lng: null });
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => resolve({ lat: null, lng: null }),
+      { timeout: 8000, enableHighAccuracy: true }
+    );
+  });
+
 export default function ContactPage() {
   const router = useRouter();
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -65,8 +75,22 @@ export default function ContactPage() {
     setSosMessage("");
     setSosFailed(false);
     try {
-      await api.sos(null, null);
-      setSosMessage("SOS triggered. If you are in immediate danger, call 112 now.");
+      const { lat, lng } = await getLocation();
+      const res = await api.sos(lat, lng);
+
+      if (res && typeof res.sent === "number") {
+        if (res.sent > 0) {
+          setSosMessage(
+            `SOS sent to ${res.sent} of ${res.total} contacts. If you are in immediate danger, call 112 now.`
+          );
+        } else {
+          setSosFailed(true);
+          setSosMessage("SOS could not be delivered to anyone. Call 112 now.");
+        }
+      } else {
+        // old backend response, no counts yet
+        setSosMessage("SOS triggered. If you are in immediate danger, call 112 now.");
+      }
     } catch (err) {
       setSosFailed(true);
       setSosMessage(
@@ -97,7 +121,7 @@ export default function ContactPage() {
             opacity: sosSending || contacts.length === 0 ? 0.6 : 1,
           }}
         >
-          {sosSending ? "Sending SOS..." : "SOS"}
+          {sosSending ? "Getting location & sending..." : "SOS"}
         </button>
         {contacts.length === 0 && (
           <p>Add at least one contact before you can send an SOS.</p>
