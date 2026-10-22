@@ -50,4 +50,8 @@ class SOSOut(BaseModel):
     id:int
     token:str
     model_config=ConfigDict(from_attributes=True)
+class LocationUpdate(BaseModel):
+    latitude:float=Field(ge=-90,le=90)
+    longitude:float=Field(ge=-180,le=180)
+    accuracy:float|None=None
 

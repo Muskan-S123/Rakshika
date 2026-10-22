@@ -8,7 +8,7 @@ from database import engine
 from models import Base, User,TrustedContact, SOSEvent, SOSSession
 from sqlalchemy.orm import Session
 from database import get_db
-from schemas import UserCreate, UserOut, UserUpdate, ContactCreate, ContactOut, SOSCreate, SOSOut
+from schemas import UserCreate, UserOut, UserUpdate, ContactCreate, ContactOut, SOSCreate, SOSOut, LocationUpdate
 from auth import hash_password, verify_password, create_jwt_token, get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta, timezone
@@ -97,10 +97,10 @@ def trigger_sos(
     db.commit()
     db.refresh(session)
     track_url = f"{FRONTEND_URL}/track/{session.token}"
+    print("TRACK URL:",track_url)
 
     background.add_task(send_sos_emails, emails, current_user.name, data.latitude, data.longitude, track_url)
     return {"id":event.id,"token":session.token}
-
 
 @app.get("/users/me",response_model=UserOut)
 def read_me(current_user:User=Depends(get_current_user)):
@@ -211,3 +211,34 @@ def delete_contact(
         raise HTTPException(status_code=404, detail="Contact not found")
     db.delete(contact)
     db.commit()
+
+@app.post("/sos/{token}/location")
+def update_location(
+    token: str,
+    data: LocationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = db.query(SOSSession).filter(SOSSession.token == token).first()
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    session.lat = data.latitude
+    session.lng = data.longitude
+    session.accuracy = data.accuracy
+    session.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"ok": True}
+@app.post("/sos/{token}/safe")
+def mark_safe(
+    token: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = db.query(SOSSession).filter(SOSSession.token == token).first()
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Not found")
+    session.active = False
+    session.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"ok": True}
