@@ -3,9 +3,10 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from html import escape
 
-def send_sos_emails(to_emails: list[str], user_name: str, lat, lng) -> dict:
+def send_sos_emails(to_emails: list[str], user_name: str, lat, lng, track_url) -> dict:
     key = os.getenv("RESEND_API_KEY")
     if not key:
+        print("RESEND_API_KEY is missing")
         return {"sent": 0, "failed": len(to_emails)}
 
     now = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M %p IST")
@@ -26,7 +27,12 @@ def send_sos_emails(to_emails: list[str], user_name: str, lat, lng) -> dict:
                     "from": "onboarding@resend.dev",
                     "to": [to],
                     "subject": f"SOS from {user_name}",
-                    "html": f"<p>{name} triggered an SOS at {now}.</p><p>{where}</p>",
+                    "html":(
+                        f"<p>{name} triggered an SOS at {now}.</p>"
+                        f"<p>{where}</p>"
+                        f'<p><a href="{escape(track_url)}">Track live location</a></p>'
+
+                    ),
                 },
                 timeout=10,
             )
@@ -38,5 +44,6 @@ def send_sos_emails(to_emails: list[str], user_name: str, lat, lng) -> dict:
         except Exception as e:
             print("SOS email failed:", to, e)
             failed += 1
-
+  
+    print("SOS email result:", {"sent": sent, "failed": failed}, "to:", to_emails)
     return {"sent": sent, "failed": failed}

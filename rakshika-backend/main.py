@@ -1,7 +1,11 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+FRONTEND_URL=os.getenv("FRONTEND_URL", "http://localhost:3000")
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine
-from models import Base, User,TrustedContact, SOSEvent
+from models import Base, User,TrustedContact, SOSEvent, SOSSession
 from sqlalchemy.orm import Session
 from database import get_db
 from schemas import UserCreate, UserOut, UserUpdate, ContactCreate, ContactOut, SOSCreate, SOSOut
@@ -9,6 +13,7 @@ from auth import hash_password, verify_password, create_jwt_token, get_current_u
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta, timezone
 from alerts import send_sos_emails
+import secrets
 
 
 Base.metadata.create_all(bind=engine)
@@ -59,7 +64,7 @@ def login(form:OAuth2PasswordRequestForm=Depends(), db: Session=Depends(get_db))
     token=create_jwt_token({"sub":user.email})
     return {"access_token": token, "token_type": "bearer"}
 
-@app.post("/sos", response_model=SOSOut, status_code=201)
+@app.post("/sos", response_model=SOSOut, status_code=201)    #trigger_sos
 def trigger_sos(
     data: SOSCreate,
     background: BackgroundTasks,
@@ -79,8 +84,23 @@ def trigger_sos(
     db.add(event)
     db.commit()
     db.refresh(event)
-    background.add_task(send_sos_emails, emails, current_user.name, data.latitude, data.longitude)
-    return event
+
+    session = SOSSession(
+        user_id=current_user.id,
+        sos_event_id=event.id,
+        token=secrets.token_urlsafe(16),
+        lat=data.latitude,
+        lng=data.longitude,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=4),
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    track_url = f"{FRONTEND_URL}/track/{session.token}"
+
+    background.add_task(send_sos_emails, emails, current_user.name, data.latitude, data.longitude, track_url)
+    return {"id":event.id,"token":session.token}
+
 
 @app.get("/users/me",response_model=UserOut)
 def read_me(current_user:User=Depends(get_current_user)):
@@ -94,6 +114,26 @@ def get_user(user_id:int, db:Session=Depends(get_db), current_user:User = Depend
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Not your account") # if id with 7 logins in id 5 it should not authenticate the person with id 7
     return current_user
+@app.get("/track/{token}")
+def track(token: str, db: Session = Depends(get_db)):
+    session = db.query(SOSSession).filter(SOSSession.token == token).first()
+    if not session or not session.active:
+        raise HTTPException(status_code=404, detail="Tracking link not found")
+
+    expires = session.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires < datetime.now(timezone.utc):
+        raise HTTPException(status_code=410, detail="Tracking link expired")
+
+    user = db.query(User).filter(User.id == session.user_id).first()
+    return {
+        "name": user.name if user else "Unknown",
+        "lat": session.lat,
+        "lng": session.lng,
+        "updated_at": session.updated_at,
+        "expires_at": expires,
+    }
 
 @app.put("/users/{user_id}",response_model=UserOut)  #update
 def update_user(
@@ -171,6 +211,3 @@ def delete_contact(
         raise HTTPException(status_code=404, detail="Contact not found")
     db.delete(contact)
     db.commit()
-
-
-

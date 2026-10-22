@@ -48,8 +48,6 @@ class SOSCreate(BaseModel):
 
 class SOSOut(BaseModel):
     id:int
-    latitude:float|None=None
-    longitude:float|None=None
-    created_at:datetime
+    token:str
     model_config=ConfigDict(from_attributes=True)
 

@@ -1,10 +1,10 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Float, DateTime, func
+from sqlalchemy import Column, Integer, String, ForeignKey, Float, Boolean, DateTime, func
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
 class User(Base):
     __tablename__="users"
-    id=Column(Integer, primary_key=True, index=True)  #nullable means column is required it cannot accept null values
+    id=Column(Integer, primary_key=True, index=True)  #nullable=False means column is required it cannot accept null values
     name=Column(String, nullable=False)
     email=Column(String, unique=True, index=True, nullable=False)
     phone=Column(String,nullable=True)
@@ -42,6 +42,20 @@ class SOSEvent(Base):
     latitude= Column(Float, nullable=True)
     longitude=Column(Float, nullable=True)
     created_at=Column(DateTime(timezone=True), server_default=func.now())
+
+class SOSSession(Base):
+    __tablename__="sos_session"
+    id=Column(Integer,primary_key=True)
+    user_id=Column(Integer, ForeignKey("users.id",ondelete="CASCADE"), nullable=False, index=True) #on_delete=cascade means if the parent id got deleted entire child objects got deleted
+    token=Column(String, unique=True, index=True, nullable=False)
+    lat=Column(Float, nullable=True)
+    lng=Column(Float, nullable=True)
+    sos_event_id=Column(Integer , ForeignKey("sos_events.id", ondelete="SET NULL"), nullable=True)  #on_delete=set null means keeps the child objects but sets foreign key to null
+    active=Column(Boolean, nullable=False, default=True)
+    accuracy=Column(Float, nullable=True)
+    created_at=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at=Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    expires_at=Column(DateTime(timezone=True), nullable=False)
 
 
 
