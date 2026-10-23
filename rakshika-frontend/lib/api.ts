@@ -81,5 +81,8 @@ export const api = {
       method:"POST",
       body:JSON.stringify({latitude:lat, longitude:lng}),
     }),
+
+  markSafe: (token: string) =>
+    request(`/sos/${token}/safe`, { method: "POST" }),
   
 };

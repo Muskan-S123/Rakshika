@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, Contact } from "@/lib/api";
+import { useLiveLocation } from "@/lib/useLiveLocation";
 
 const getLocation = () =>
   new Promise<{ lat: number | null; lng: number | null }>((resolve) => {
@@ -25,6 +26,7 @@ export default function ContactPage() {
   const [sosSending, setSosSending] = useState(false);
   const [sosMessage, setSosMessage] = useState("");
   const [sosFailed, setSosFailed] = useState(false);
+  const [sosToken, setSosToken] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -38,6 +40,19 @@ export default function ContactPage() {
     }
     load();
   }, []);
+
+  // restore active session after refresh
+  useEffect(() => {
+    setSosToken(localStorage.getItem("sos_token"));
+  }, []);
+
+  // start sending GPS every ~10s while a session is active
+  useLiveLocation(sosToken, () => {
+    localStorage.removeItem("sos_token");
+    setSosToken(null);
+  });
+
+  
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -78,6 +93,12 @@ export default function ContactPage() {
       const { lat, lng } = await getLocation();
       const res = await api.sos(lat, lng);
 
+      // start live location sharing
+      if (res?.token) {
+        localStorage.setItem("sos_token", res.token);
+        setSosToken(res.token);
+      }
+
       if (res && typeof res.sent === "number") {
         if (res.sent > 0) {
           setSosMessage(
@@ -102,6 +123,19 @@ export default function ContactPage() {
     }
   }
 
+  async function handleSafe() {
+    if (!sosToken) return;
+    try {
+      await api.markSafe(sosToken);
+    } catch {
+      // ignore — even if the server call fails, stop locally
+    }
+    localStorage.removeItem("sos_token");
+    setSosToken(null);
+    setSosMessage("You marked yourself safe. Sharing stopped.");
+    setSosFailed(false);
+  }
+
   return (
     <main style={{ maxWidth: 480, margin: "40px auto", display: "grid", gap: 12 }}>
       <h1>Contacts</h1>
@@ -123,22 +157,70 @@ export default function ContactPage() {
         >
           {sosSending ? "Getting location & sending..." : "SOS"}
         </button>
+
         {contacts.length === 0 && (
           <p>Add at least one contact before you can send an SOS.</p>
         )}
+
         {sosMessage && (
           <p style={{ color: sosFailed ? "red" : "green" }}>{sosMessage}</p>
         )}
+
+        {sosToken && (
+          <>
+            <button
+              onClick={handleSafe}
+              style={{
+                background: "green",
+                color: "white",
+                padding: 12,
+                fontSize: 16,
+                fontWeight: "bold",
+                border: "none",
+                borderRadius: 8,
+                cursor: "pointer",
+              }}
+            >
+              I'm safe — stop sharing
+            </button>
+            <p style={{ fontSize: 14, color: "#555" }}>
+              Sharing live location. Keep this tab open and the screen on until
+              you press "I'm safe".
+            </p>
+          </>
+        )}
+
         <a href="tel:112">Call 112 (emergency)</a>
       </section>
 
       {error && <p style={{ color: "red" }}>{error}</p>}
 
       <form onSubmit={handleAdd} style={{ display: "grid", gap: 8 }}>
-        <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-        <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        <input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
-        <input placeholder="Relation" value={relation} onChange={(e) => setRelation(e.target.value)} required />
+        <input
+          placeholder="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <input
+          placeholder="Phone"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          required
+        />
+        <input
+          placeholder="Relation"
+          value={relation}
+          onChange={(e) => setRelation(e.target.value)}
+          required
+        />
         <button type="submit">Add contact</button>
       </form>
 
