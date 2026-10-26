@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import dynamic from "next/dynamic";
+const LiveMap = dynamic(() => import("../../../components/LiveMap"), { ssr: false });
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -65,6 +67,7 @@ export default function TrackPage() {
       <h1>{data.name} sent an SOS</h1>
       {hasLoc ? (
         <>
+         <LiveMap lat={data.lat!} lng={data.lng!} />
           <p>
             Last location: {data.lat}, {data.lng}
           </p>
