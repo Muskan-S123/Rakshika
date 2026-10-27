@@ -1,24 +1,24 @@
 "use client";
 import { useEffect } from "react";
-import function useWakeLock(params:type) {
-    useEffect(()=>{
-        if (!active || !("wakeLock in navigator")) return;
-        let lock: WakeLockSentinel | null=null;
-        let cancelled=false;
 
-        const acquire=async()=>{
-            try{
-                const l= await.navigator.wakeLock.request("screen");
-                if(cancelled){ l.release(); return; }
-                lock=l;
+export function useWakeLock(active: boolean) {
+  useEffect(() => {
+    if (!active || !("wakeLock" in navigator)) return;
 
-            }catch(err){
-                console.warn("wake lock failed", err);
+    let lock: WakeLockSentinel | null = null;
+    let cancelled = false;
 
-            }
-        };
-        
-         const onVisible = () => {
+    const acquire = async () => {
+      try {
+        const l = await navigator.wakeLock.request("screen");
+        if (cancelled) { l.release(); return; }
+        lock = l;
+      } catch (err) {
+        console.warn("wake lock failed", err);
+      }
+    };
+
+    const onVisible = () => {
       if (document.visibilityState === "visible") acquire();
     };
 
