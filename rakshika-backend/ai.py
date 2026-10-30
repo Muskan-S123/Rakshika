@@ -40,7 +40,8 @@ def analyze_message(text: str) -> dict:
     api_key = os.getenv("GEMINI_API_KEY")
     model = os.getenv("GEMINI_MODEL")
     if not api_key or not model:
-        raise AIAnalysisError("AI is not configured")
+        missing = [n for n, v in (("GEMINI_API_KEY", api_key), ("GEMINI_MODEL", model)) if not v]
+        raise AIAnalysisError(f"AI is not configured, missing: {missing}")
     try:
         client = genai.Client(api_key=api_key)
         resp = client.models.generate_content(
