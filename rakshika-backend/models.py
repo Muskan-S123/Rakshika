@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Float, Boolean, DateTime, func
+from sqlalchemy import Column, Integer, String, ForeignKey, Float, Boolean, DateTime, Text, JSON, func
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
+
 class User(Base):
     __tablename__="users"
     id=Column(Integer, primary_key=True, index=True)  #nullable=False means column is required it cannot accept null values
@@ -56,3 +57,17 @@ class SOSSession(Base):
     created_at=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at=Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     expires_at=Column(DateTime(timezone=True), nullable=False)
+
+class Report(Base):
+    __tablename__="reports"
+    id=Column(Integer, primary_key=True, index=True)
+    user_id=Column(Integer, ForeignKey("users.id",ondelete="CASCADE"), nullable=False, index=True)
+    message_text=Column(Text, nullable=False)
+    category=Column(String, nullable=False)
+    severity=Column(String, nullable=False)
+    explanation=Column(Text, nullable=True)
+    suggested_actions=Column(JSON, nullable=True)
+    created_at=Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+    

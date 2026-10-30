@@ -2,18 +2,23 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 FRONTEND_URL=os.getenv("FRONTEND_URL", "http://localhost:3000")
+import logging
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine
-from models import Base, User,TrustedContact, SOSEvent, SOSSession
+from models import Base, User,TrustedContact, SOSEvent, SOSSession, Report
 from sqlalchemy.orm import Session
+from ai import analyze_message, AIAnalysisError
 from database import get_db
-from schemas import UserCreate, UserOut, UserUpdate, ContactCreate, ContactOut, SOSCreate, SOSOut, LocationUpdate
+from schemas import UserCreate, UserOut, UserUpdate, ContactCreate, ContactOut, SOSCreate, SOSOut, LocationUpdate, ReportCreate, ReportOut
 from auth import hash_password, verify_password, create_jwt_token, get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import datetime, timedelta, timezone
 from alerts import send_sos_emails
 import secrets
+
+log = logging.getLogger(__name__)
+import models, schemas
 
 
 Base.metadata.create_all(bind=engine)
@@ -102,6 +107,27 @@ def trigger_sos(
     background.add_task(send_sos_emails, emails, current_user.name, data.latitude, data.longitude, track_url)
     return {"id":event.id,"token":session.token}
 
+@app.post("/reports",response_model=schemas.ReportOut, status_code=201)
+def create_report(
+    payload:schemas.ReportCreate,
+    db:Session = Depends(get_db),
+    current_user:models.User=Depends(get_current_user),
+):
+    try:
+        result=analyze_message(payload.message_text)
+    except AIAnalysisError as e:
+        log.error("AI Analysis failed: %s",e)
+        raise HTTPException(status_code=502,detail="Analysis failed. Please try again.")
+    report=models.Report(
+        user_id=current_user.id,
+        message_text=payload.message_text,
+        **result,
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+    return report
+
 @app.get("/users/me",response_model=UserOut)
 def read_me(current_user:User=Depends(get_current_user)):
     return current_user
@@ -134,6 +160,34 @@ def track(token: str, db: Session = Depends(get_db)):
         "updated_at": session.updated_at,
         "expires_at": expires,
     }
+@app.get("/reports", response_model=list[schemas.ReportOut])
+def list_reports(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    return (
+        db.query(models.Report)
+        .filter(models.Report.user_id == current_user.id)
+        .order_by(models.Report.created_at.desc())
+        .limit(50)
+        .all()
+    )
+
+
+@app.get("/reports/{report_id}", response_model=schemas.ReportOut)
+def get_report(
+    report_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    report = (
+        db.query(models.Report)
+        .filter(models.Report.id == report_id, models.Report.user_id == current_user.id)
+        .first()
+    )
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report
 
 @app.put("/users/{user_id}",response_model=UserOut)  #update
 def update_user(

@@ -1,5 +1,7 @@
 from datetime import datetime
+from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
 class UserCreate(BaseModel):
     name: str=Field(min_length=1, max_length=100)
     email: EmailStr
@@ -54,4 +56,29 @@ class LocationUpdate(BaseModel):
     latitude:float=Field(ge=-90,le=90)
     longitude:float=Field(ge=-180,le=180)
     accuracy:float|None=None
+class ReportCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+    message_text:str =Field(min_length=1, max_length=5000)
+
+
+class ReportOut(BaseModel):
+    id:int
+    message_text:str
+    category:str
+    severity:str
+    explanation:str | None=None
+    suggested_actions:list[str] | None=None
+    created_at:datetime
+    model_config=ConfigDict(from_attributes=True)
+
+class Classification(BaseModel):
+    category: Literal["threat", "harassment", "scam", "spam", "safe"]
+    severity: Literal["low", "medium", "high"]
+    subtype: Optional[str] = None
+    variant: Optional[str] = None
+    explanation: str
+    recommended_actions: list[str]
+
+
+
 
