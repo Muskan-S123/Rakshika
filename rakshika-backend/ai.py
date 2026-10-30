@@ -34,6 +34,14 @@ Return ONLY JSON matching the schema.
 """
 SEXTORTION_HINTS = ["nude", "video call", "webcam", "send to your contacts",
                     "your friends and family", "leak", "bitcoin", "pay or"]
+SEXTORTION_ACTIONS = [
+    "Do not pay and do not send any more photos or videos.",
+    "Do not delete anything. Screenshot the messages, profile and payment demands first.",
+    "Save usernames, links and phone numbers before you block anyone.",
+    "Report at cybercrime.gov.in or call 1930.",
+    "If intimate images exist, StopNCII.org can help stop them spreading (adults).",
+    "Tell one person you trust. Do not handle this alone.",
+]
 
 
 def analyze_message(text: str) -> dict:
@@ -62,6 +70,8 @@ def analyze_message(text: str) -> dict:
         result.category = "threat"
         result.severity = "high"
         result.subtype = "sextortion"
+    is_sextortion = result.subtype == "sextortion" or sum(h in lowered for h in SEXTORTION_HINTS) >= 2
+    actions = SEXTORTION_ACTIONS if is_sextortion else result.recommended_actions
 
     return {
         "category": result.category,

@@ -113,6 +113,9 @@ def create_report(
     db:Session = Depends(get_db),
     current_user:models.User=Depends(get_current_user),
 ):
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=10)  #cooldown for 10 sec 
+    if db.query(Report).filter(Report.user_id == current_user.id, Report.created_at > cutoff).first():
+        raise HTTPException(status_code=429, detail="Please wait a few seconds before submitting another report")
     try:
         result=analyze_message(payload.message_text)
     except AIAnalysisError as e:
