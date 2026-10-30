@@ -121,7 +121,10 @@ def create_report(
     report=models.Report(
         user_id=current_user.id,
         message_text=payload.message_text,
-        **result,
+        category=result["category"],
+        severity=result["severity"],
+        explanation=result["explanation"],
+        suggested_actions=result["suggested_actions"],
     )
     db.add(report)
     db.commit()
