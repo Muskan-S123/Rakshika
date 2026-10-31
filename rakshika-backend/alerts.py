@@ -4,9 +4,10 @@ from zoneinfo import ZoneInfo
 from html import escape
 
 def send_sos_emails(to_emails: list[str], user_name: str, lat, lng, track_url) -> dict:
-    key = os.getenv("RESEND_API_KEY")
-    if not key:
-        print("RESEND_API_KEY is missing")
+    key = os.getenv("BREVO_API_KEY")
+    sender = os.getenv("EMAIL_FROM")
+    if not key or not sender:
+        print("BREVO_API_KEY or EMAIL_FROM is missing")
         return {"sent": 0, "failed": len(to_emails)}
 
     now = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M %p IST")
@@ -21,29 +22,28 @@ def send_sos_emails(to_emails: list[str], user_name: str, lat, lng, track_url) -
     for to in to_emails:
         try:
             r = httpx.post(
-                "https://api.resend.com/emails",
-                headers={"Authorization": f"Bearer {key}"},
+                "https://api.brevo.com/v3/smtp/email",
+                headers={"api-key": key, "Content-Type": "application/json"},
                 json={
-                    "from": "onboarding@resend.dev",
-                    "to": [to],
+                    "sender": {"name": "Rakshika", "email": sender},
+                    "to": [{"email": to}],
                     "subject": f"SOS from {user_name}",
-                    "html":(
+                    "htmlContent": (
                         f"<p>{name} triggered an SOS at {now}.</p>"
                         f"<p>{where}</p>"
                         f'<p><a href="{escape(track_url)}">Track live location</a></p>'
-
                     ),
                 },
                 timeout=10,
             )
             if r.status_code >= 400:
-                print("Resend rejected:", to, r.status_code, r.text)
+                print("Brevo rejected:", to, r.status_code, r.text)
                 failed += 1
             else:
                 sent += 1
         except Exception as e:
             print("SOS email failed:", to, e)
             failed += 1
-  
+
     print("SOS email result:", {"sent": sent, "failed": failed}, "to:", to_emails)
     return {"sent": sent, "failed": failed}
