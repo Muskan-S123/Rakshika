@@ -119,7 +119,7 @@ export default function Home() {
                     </nav>
                     <div className="relative min-h-[280px] flex-1 overflow-hidden rounded-2xl">
                         <Image
-                            src="/woman.webp"
+                            src="/womenpic.webp"
                             alt="Illustration of women with flowing hair gathered in a circle"
                             fill
                             priority
