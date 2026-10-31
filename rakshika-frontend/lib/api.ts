@@ -8,6 +8,18 @@ export type Contact = {
   relation: string;
 };
 
+export type Report={
+  id:number;
+  message_text:string;
+  category:string;
+  severity:string;
+  explanation:string;
+  suggested_actions:string[] | string;
+  created_at:string;
+
+
+};
+
 function token() {
   return typeof window === "undefined" ? null : localStorage.getItem("token");
 }
@@ -84,5 +96,16 @@ export const api = {
 
   markSafe: (token: string) =>
     request(`/sos/${token}/safe`, { method: "POST" }),
+
+  createReport: (message_text: string): Promise<Report> =>
+    request("/reports", {
+      method: "POST",
+      body: JSON.stringify({ message_text }),
+    }),
+
+  listReports: (): Promise<Report[]> => request("/reports"),
+
+  getReport: (id: number): Promise<Report> => request(`/reports/${id}`),
+  
   
 };
